@@ -1,4 +1,4 @@
-import typer, questionary, os, docker
+import typer, questionary, os, docker, time
 from yaspin import yaspin
 
 docker = docker.from_env()
@@ -45,9 +45,7 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
                 packages = pip_requirements.split()
                 if packages:
                     Dockerfile += "RUN pip install " + " ".join(packages) + "\n"
-        else:
-            Dockerfile += "RUN pip install --no-cache-dir\n"
-
+  
     importDir = questionary.text("Import directory? Enter a path to the directory to import, or leave empty for none.").ask()
     if importDir:
         if os.path.isdir(importDir):
@@ -74,14 +72,8 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
             Dockerfile += "RUN sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config\n"
             Dockerfile += "EXPOSE 22\n"
 
-        # if "Tailscale" in features:
-        #     Dockerfile += "RUN curl -fsSL https://tailscale.com/install.sh | sh\n"
-        #     Dockerfile += "RUN tailscaled --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1055 &\n"
-        #     authKey = questionary.text("Enter your Tailscale auth key:").ask()
-        #     if authKey:
-        #         Dockerfile += f"RUN tailscale up --auth-key={authKey}\n"
-        #     else:
-        #         typer.echo("No Tailscale auth key provided. Tailscale will not be configured.")
+        if "Tailscale" in features:
+            Dockerfile += "RUN curl -fsSL https://tailscale.com/install.sh | sh\n"
 
         if "OpenVSCode Server" in features:
             Dockerfile += "RUN curl -fsSL https://code-server.dev/install.sh | sh\n"
@@ -113,19 +105,30 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
     if "OpenVSCode Server" in features:
         ports['8080/tcp'] = None
 
-    # Determine the command to run in the container
-    cmd = []
-    if "SSH" in features and "OpenVSCode Server" in features:
-        cmd = [
-            "sh", "-c",
-            "/usr/sbin/sshd && code-server"
-        ]
-    elif "SSH" in features:
-        cmd = ["/usr/sbin/sshd", "-D"]
-    elif "OpenVSCode Server" in features:
-        cmd = ["code-server"]
-    else:
-        cmd = ["sleep", "infinity"]
+    tailscale_cmd = ""
+    if "Tailscale" in features:
+        authKey = questionary.text("Enter your Tailscale auth key:").ask()
+        if authKey:
+            # Start tailscaled in background, then up, then exec the rest
+            tailscale_cmd = f"tailscaled --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1055 & sleep 2 && tailscale up --auth-key={authKey} && "
+        else:
+            typer.echo("No Tailscale auth key provided. Tailscale will not be configured.")
+
+    main_cmds = []
+    if "SSH" in features:
+        main_cmds.append("/usr/sbin/sshd -D")
+    if "OpenVSCode Server" in features:
+        main_cmds.append("code-server")
+    if not main_cmds:
+        main_cmds.append("sleep infinity")
+
+    # Join main commands with '&' to run in parallel, then wait
+    parallel_cmd = " & ".join(main_cmds) + " & wait"
+
+    # Prepend tailscale_cmd if needed
+    full_cmd = f"{tailscale_cmd}{parallel_cmd}"
+
+    cmd = ["sh", "-c", full_cmd]
 
     container = docker.containers.run(
         image=imageId,
@@ -136,16 +139,22 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
         ports=ports,
     )
     typer.echo(f"Docker container '{name}' created successfully.")
-    if "SSH" in features or "OpenVSCode Server" in features:
+    if "SSH" in features or "OpenVSCode Server" in features or "Tailscale" in features:
         typer.echo("\nTo access the container, use the following commands:")
         container.reload()
         if "SSH" in features:
             typer.echo(f"ssh root@localhost -p {container.attrs['NetworkSettings']['Ports']['22/tcp'][0]['HostPort']}")
         if "OpenVSCode Server" in features:
             typer.echo(f"Open your browser and go to http://localhost:{container.attrs['NetworkSettings']['Ports']['8080/tcp'][0]['HostPort']}")
-    
-    toSSH = questionary.confirm("Do you want to SSH into the container?").ask()
-    if toSSH:
-        os.system(f"ssh root@localhost -p {container.attrs['NetworkSettings']['Ports']['22/tcp'][0]['HostPort']}")
+        if "Tailscale" in features:
+            typer.echo("Waiting for Tailscale to connect...")
+            time.sleep(5)
+            tailscale_ip = container.exec_run("tailscale ip -4")[1].decode().strip()
+            typer.echo(f"Tailscale IP: {tailscale_ip}")
+
+    if "SSH" in features:
+        toSSH = questionary.confirm("Do you want to SSH into the container?").ask()
+        if toSSH:
+            os.system(f"ssh root@localhost -p {container.attrs['NetworkSettings']['Ports']['22/tcp'][0]['HostPort']}")
 
 app()
