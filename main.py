@@ -38,7 +38,7 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
         pip_requirements = questionary.text("pip requirements? Enter a space-separated list of packages, filepath to a requirements.txt file, or leave empty for none.").ask()
         if pip_requirements:
             if os.path.isfile(pip_requirements):
-                path = os.path.abspath(pip_requirements)
+                path = pip_requirements
                 Dockerfile += "COPY " + path + " /app/requirements.txt\n"
                 Dockerfile += "RUN pip install -r requirements.txt\n"
             else:
@@ -49,7 +49,7 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
     importDir = questionary.text("Import directory? Enter a path to the directory to import, or leave empty for none.").ask()
     if importDir:
         if os.path.isdir(importDir):
-            path = os.path.abspath(importDir)
+            path = importDir
             Dockerfile += "COPY " + path + " /app/\n"
         else:
             typer.echo("Invalid directory path provided.")
