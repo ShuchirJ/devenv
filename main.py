@@ -27,15 +27,19 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
     "Select a framework",
     choices=[
         "Python",
-        "Static HTML",
         "General Purpose"
     ]).ask()
 
+    if not framework: exit(0)
+
     if framework == "Python":
         version = askPyVersion()
+        if version is None: exit(0)
         Dockerfile += "FROM python:" + version + "\n"
         Dockerfile += "WORKDIR /app\n"
         pip_requirements = questionary.text("pip requirements? Enter a space-separated list of packages, filepath to a requirements.txt file, or leave empty for none.").ask()
+        if pip_requirements == None: exit(0)
+
         if pip_requirements:
             if os.path.isfile(pip_requirements):
                 path = pip_requirements
@@ -51,6 +55,7 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
         Dockerfile += "WORKDIR /app\n"
 
     importDir = questionary.text("Import directory? Enter a path to the directory to import, or leave empty for none.").ask()
+    if importDir is None: exit(0)
     if importDir:
         if os.path.isdir(importDir):
             path = importDir
@@ -70,6 +75,8 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
             "Wget", 
             "Nano"
         ]).ask()
+    if features is None: exit(0)
+
     if features:
         if "SSH" in features:
             Dockerfile += "RUN apt-get update && apt-get install -y openssh-server\n"
@@ -99,6 +106,27 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
 
         if "Nano" in features:
             Dockerfile += "RUN apt-get update && apt-get install -y nano\n"
+
+    databases = questionary.checkbox(
+        "Select databases to include",
+        choices=[
+            "MongoDB"
+        ]).ask()
+    if databases is None: exit(0)
+
+    if databases:
+        if "MongoDB" in databases:
+            Dockerfile += "RUN apt-get update && apt-get install -y gnupg curl\n"
+            Dockerfile += "RUN curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor\n"
+            Dockerfile += 'RUN echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | tee /etc/apt/sources.list.d/mongodb-org-8.0.list\n'
+            Dockerfile += "RUN apt-get update && apt-get install -y mongodb-org\n"
+            Dockerfile += "RUN mkdir -p /data/db\n"
+            Dockerfile += "RUN chown -R mongodb:mongodb /data/db\n"
+            Dockerfile += "RUN mkdir -p /var/lib/mongodb\n"
+            Dockerfile += "RUN chown -R mongodb:mongodb /var/lib/mongodb\n"
+            Dockerfile += "RUN mkdir -p /var/log/mongodb\n"
+            Dockerfile += "RUN chown -R mongodb:mongodb /var/log/mongodb\n"
+            Dockerfile += "EXPOSE 27017\n"
 
     typer.echo("Saving Dockerfile...")
     with open("Dockerfile", "w") as f:
@@ -135,6 +163,8 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
         main_cmds.append("/usr/sbin/sshd -D")
     if "OpenVSCode Server" in features:
         main_cmds.append("code-server")
+    if "MongoDB" in databases:
+        main_cmds.append("mongod --bind_ip_all")
     if not main_cmds:
         main_cmds.append("sleep infinity")
 
