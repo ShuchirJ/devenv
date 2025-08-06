@@ -46,6 +46,10 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
                 if packages:
                     Dockerfile += "RUN pip install " + " ".join(packages) + "\n"
   
+    elif framework == "General Purpose":
+        Dockerfile += "FROM debian:bookworm-slim" + "\n"
+        Dockerfile += "WORKDIR /app\n"
+
     importDir = questionary.text("Import directory? Enter a path to the directory to import, or leave empty for none.").ask()
     if importDir:
         if os.path.isdir(importDir):
@@ -62,6 +66,9 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
             "Tailscale",
             "OpenVSCode Server",
             "Git",
+            "Curl",
+            "Wget", 
+            "Nano"
         ]).ask()
     if features:
         if "SSH" in features:
@@ -83,6 +90,15 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
 
         if "Git" in features:
             Dockerfile += "RUN apt-get update && apt-get install -y git\n"
+
+        if "Curl" in features:
+            Dockerfile += "RUN apt-get update && apt-get install -y curl\n"
+
+        if "Wget" in features:
+            Dockerfile += "RUN apt-get update && apt-get install -y wget\n"
+
+        if "Nano" in features:
+            Dockerfile += "RUN apt-get update && apt-get install -y nano\n"
 
     typer.echo("Saving Dockerfile...")
     with open("Dockerfile", "w") as f:
