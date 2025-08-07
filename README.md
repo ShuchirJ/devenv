@@ -24,7 +24,7 @@ Development environments can be based on one of the following images at the mome
 
 ### Usage
 ```bash
-pip install devenv
+pip install devenv-cli
 devenv --help
 ```
 
