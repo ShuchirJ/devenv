@@ -87,9 +87,11 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
             Dockerfile += "EXPOSE 22\n"
 
         if "Tailscale" in features:
+            Dockerfile += "RUN apt-get update && apt-get install -y curl\n"
             Dockerfile += "RUN curl -fsSL https://tailscale.com/install.sh | sh\n"
 
         if "OpenVSCode Server" in features:
+            Dockerfile += "RUN apt-get update && apt-get install -y curl\n"
             Dockerfile += "RUN curl -fsSL https://code-server.dev/install.sh | sh\n"
             Dockerfile += "EXPOSE 8080\n"
             # Set up code-server config for no password and bind to 0.0.0.0
