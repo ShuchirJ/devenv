@@ -254,4 +254,40 @@ def info(name: str = typer.Argument(help="Name of the dev environment", default=
             typer.echo(f"MongoDB Port: {mongodb_port}")
 
 
+@app.command(name="destroy")
+def destroy(name: str = typer.Argument(help="Name of the dev environment", default=None)):
+    """
+    Destroy a dev env
+    """
+    container = None
+    if name:
+        try:
+            container = docker.containers.get(name)
+        except:
+            typer.echo(f"Container '{name}' not found.")
+    if not container:
+        containers = docker.containers.list(filters={"label": "dev_env"})
+        if not containers:
+            typer.echo("No dev environments found.")
+            return
+        
+        containerName = questionary.select(
+            "Select a dev environment to destroy",
+            choices=[c.name for c in containers]
+        ).ask()
+        if not containerName:
+            typer.echo("No dev environment selected.")
+            return
+        container = docker.containers.get(containerName)
+
+    confirm = questionary.confirm(f"Are you sure you want to destroy the dev environment '{container.name}'? This action cannot be undone.").ask()
+    if not confirm:
+        typer.echo("Aborting.")
+        return
+
+    with yaspin():
+        container.remove(force=True)
+    typer.echo(f"Dev environment '{container.name}' destroyed successfully.")
+
+
 app()
