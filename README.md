@@ -28,7 +28,7 @@ pip install devenv
 devenv --help
 ```
 
-![](demo.mp4)
+[Demo](demo.mp4)
 
 ### Supports:
 - creating an environment
