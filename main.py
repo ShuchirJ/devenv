@@ -150,6 +150,8 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
         ports['22/tcp'] = None
     if "OpenVSCode Server" in features:
         ports['8080/tcp'] = None
+    if "MongoDB" in databases:
+        ports['27017/tcp'] = None
 
     tailscale_cmd = ""
     if "Tailscale" in features:
@@ -185,6 +187,7 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
         auto_remove=True,
         command=cmd,
         ports=ports,
+        labels={"dev_env": "true"},
     )
     typer.echo(f"Docker container '{name}' created successfully.")
     if "SSH" in features or "OpenVSCode Server" in features or "Tailscale" in features:
@@ -200,9 +203,55 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
             tailscale_ip = container.exec_run("tailscale ip -4")[1].decode().strip()
             typer.echo(f"Tailscale IP: {tailscale_ip}")
 
+    if "MongoDB" in databases:
+        container.reload()
+        typer.echo(f"MongoDB is running on system port {container.attrs['NetworkSettings']['Ports']['27017/tcp'][0]['HostPort']}")
+
     if "SSH" in features:
         toSSH = questionary.confirm("Do you want to SSH into the container?").ask()
         if toSSH:
             os.system(f"ssh root@localhost -p {container.attrs['NetworkSettings']['Ports']['22/tcp'][0]['HostPort']}")
+
+
+@app.command(name="info")
+def info(name: str = typer.Argument(help="Name of the dev environment", default=None)):
+    """
+    Show information about a dev env
+    """
+    container = None
+    if name:
+        try:
+            container = docker.containers.get(name)
+        except:
+            typer.echo(f"Container '{name}' not found.")
+    if not container:
+        containers = docker.containers.list(filters={"label": "dev_env"})
+        if not containers:
+            typer.echo("No dev environments found.")
+            return
+        
+        containerName = questionary.select(
+            "Select a dev environment",
+            choices=[c.name for c in containers]
+        ).ask()
+        if not containerName:
+            typer.echo("No dev environment selected.")
+            return
+        container = docker.containers.get(containerName)
+
+
+    typer.echo(f"ID: {container.id}")
+    ports = container.attrs['NetworkSettings']['Ports']
+    if ports:
+        if '22/tcp' in ports:
+            ssh_port = ports['22/tcp'][0]['HostPort']
+            typer.echo(f"SSH Port: {ssh_port}")
+        if '8080/tcp' in ports:
+            vscode_port = ports['8080/tcp'][0]['HostPort']
+            typer.echo(f"OpenVSCode Server Port: {vscode_port}")
+        if '27017/tcp' in ports:
+            mongodb_port = ports['27017/tcp'][0]['HostPort']
+            typer.echo(f"MongoDB Port: {mongodb_port}")
+
 
 app()
