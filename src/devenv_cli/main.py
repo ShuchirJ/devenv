@@ -1,5 +1,7 @@
 import typer, questionary, os, docker, time
 from yaspin import yaspin
+from docker import APIClient
+import json
 
 docker = docker.from_env()
 app = typer.Typer()
@@ -139,12 +141,28 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment"),
     imageId = None
     if verbose:
         typer.echo("Building Docker image...")
-        image = docker.images.build(
+        client = APIClient()  # Low-level API for streaming output
+        build_output = client.build(
             path=".",
+            rm=True,
             forcerm=True,
-            quiet=False,
+            decode=True  # Gives us dicts instead of raw bytes
         )
-        imageId = image[0].id
+        imageId = None
+        for chunk in build_output:
+            if "stream" in chunk:
+                typer.echo(chunk["stream"], nl=False)
+            if "aux" in chunk and "ID" in chunk["aux"]:
+                imageId = chunk["aux"]["ID"]
+            if "error" in chunk:
+                typer.echo(f"Error: {chunk['error']}")
+                raise SystemExit(1)
+
+        if not imageId:
+            typer.echo("Warning: Image ID not found, inspecting last built image...")
+            last_image = docker.images.list()[0]
+            imageId = last_image.i
+
         typer.echo(f"Docker image '{imageId}' created successfully.")
     else:
         with yaspin():
