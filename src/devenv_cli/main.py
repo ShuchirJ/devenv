@@ -17,7 +17,8 @@ def askPyVersion():
 
 
 @app.command(name="create")
-def create(name: str = typer.Argument(..., help="Name of the dev environment")):
+def create(name: str = typer.Argument(..., help="Name of the dev environment"),
+           verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")):
     """
     Create a new dev env
     """
@@ -139,7 +140,8 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment")):
         typer.echo("Building Docker image...")
         image = docker.images.build(
             path=".",
-            forcerm=True
+            forcerm=True,
+            quiet=not verbose,
         )
         imageId = image[0].id
         typer.echo(f"Docker image '{imageId}' created successfully.")
