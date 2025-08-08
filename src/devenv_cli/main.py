@@ -136,15 +136,26 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment"),
         f.write(Dockerfile)
     typer.echo("Dockerfile created successfully.")
 
-    with yaspin():
+    imageId = None
+    if verbose:
         typer.echo("Building Docker image...")
         image = docker.images.build(
             path=".",
             forcerm=True,
-            quiet=not verbose,
+            quiet=False,
         )
         imageId = image[0].id
         typer.echo(f"Docker image '{imageId}' created successfully.")
+    else:
+        with yaspin():
+            typer.echo("Building Docker image...")
+            image = docker.images.build(
+                path=".",
+                forcerm=True,
+                quiet=True,
+            )
+            imageId = image[0].id
+            typer.echo(f"Docker image '{imageId}' created successfully.")
 
     typer.echo("Creating Docker container...")
     ports = {}
