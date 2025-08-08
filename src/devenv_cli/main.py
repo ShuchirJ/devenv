@@ -18,7 +18,7 @@ def askPyVersion():
 
 @app.command(name="create")
 def create(name: str = typer.Argument(..., help="Name of the dev environment"),
-           verbose: bool = typer.Option(default=False, help="Enable verbose output")):
+           verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output")):
     """
     Create a new dev env
     """
