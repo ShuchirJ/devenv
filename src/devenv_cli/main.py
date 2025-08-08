@@ -1,4 +1,4 @@
-import typer, questionary, os, docker, time
+import typer, questionary, os, docker, time, shutil
 from yaspin import yaspin
 from docker import APIClient
 import json
@@ -24,6 +24,9 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment"),
     """
     Create a new dev env
     """
+    devenv_dir = os.path.expanduser("~/.devenv")
+    os.makedirs(devenv_dir, exist_ok=True)
+    
     Dockerfile = ""
 
     framework = questionary.select(
@@ -133,8 +136,9 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment"),
             Dockerfile += "RUN chown -R mongodb:mongodb /var/log/mongodb\n"
             Dockerfile += "EXPOSE 27017\n"
 
-    typer.echo("Saving Dockerfile...")
-    with open("Dockerfile", "w") as f:
+    dockerfile_path = os.path.join(devenv_dir, "Dockerfile")
+    typer.echo(f"Saving Dockerfile to {dockerfile_path}...")
+    with open(dockerfile_path, "w") as f:
         f.write(Dockerfile)
     typer.echo("Dockerfile created successfully.")
 
@@ -143,7 +147,7 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment"),
         typer.echo("Building Docker image...")
         client = APIClient()  # Low-level API for streaming output
         build_output = client.build(
-            path=".",
+            path=devenv_dir,
             rm=True,
             forcerm=True,
             decode=True  # Gives us dicts instead of raw bytes
@@ -161,14 +165,14 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment"),
         if not imageId:
             typer.echo("Warning: Image ID not found, inspecting last built image...")
             last_image = docker.images.list()[0]
-            imageId = last_image.i
+            imageId = last_image.id
 
         typer.echo(f"Docker image '{imageId}' created successfully.")
     else:
         with yaspin():
             typer.echo("Building Docker image...")
             image = docker.images.build(
-                path=".",
+                path=devenv_dir,
                 forcerm=True,
                 quiet=True,
             )
