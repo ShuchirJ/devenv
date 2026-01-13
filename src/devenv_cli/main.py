@@ -86,7 +86,7 @@ def create(name: str = typer.Argument(..., help="Name of the dev environment"),
     if features:
         if "SSH" in features:
             Dockerfile += "RUN apt-get update && apt-get install -y openssh-server\n"
-            Dockerfile += "RUN mkdir /var/run/sshd\n"
+            Dockerfile += "RUN mkdir -p /var/run/sshd\n"
             Dockerfile += "RUN echo 'root:root' | chpasswd\n"
             Dockerfile += "RUN sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config\n"
             Dockerfile += "RUN sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config\n"
